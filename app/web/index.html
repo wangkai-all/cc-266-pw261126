@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用途视图脱敏策略引擎</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>用途视图脱敏策略引擎</h1>
+  <div id="global-status" class="status-pill">读取活动版本中…</div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="query">① 用途查询工作台</button>
+  <button class="tab" data-tab="policy">② 策略规则与发布</button>
+  <button class="tab" data-tab="jobs">③ 导出任务与审计</button>
+</nav>
+
+<!-- ===================================================== 查询工作台 -->
+<section id="tab-query" class="panel active">
+  <div class="card">
+    <div class="row">
+      <label>用途
+        <select id="q-purpose">
+          <option value="operations">operations 运营</option>
+          <option value="analytics">analytics 分析</option>
+          <option value="outsourcing">outsourcing 外包</option>
+        </select>
+      </label>
+      <label>主表 <select id="q-table"></select></label>
+      <label>模式
+        <select id="q-mode">
+          <option value="group">分组聚合（受 k 匿名保护）</option>
+          <option value="detail">明细查询（需用途允许）</option>
+        </select>
+      </label>
+      <button id="q-run" class="primary">执行查询</button>
+      <button id="q-export">提交导出任务</button>
+    </div>
+    <div id="q-rule-hint" class="hint"></div>
+  </div>
+
+  <div class="card">
+    <h3>过滤条件（仅可选该用途暴露列）</h3>
+    <div class="row">
+      <select id="f-col"></select>
+      <select id="f-op">
+        <option>=</option><option>!=</option><option>&gt;=</option>
+        <option>&lt;=</option><option>&gt;</option><option>&lt;</option>
+        <option>like</option><option>in</option>
+      </select>
+      <input id="f-value" placeholder="标量；in 用逗号分隔">
+      <button id="f-add">加条件</button>
+    </div>
+    <ul id="f-list" class="chips"></ul>
+  </div>
+
+  <div class="card" id="group-card">
+    <h3>分组与聚合</h3>
+    <div class="row">
+      <label>分组列 <select id="g-col"></select></label>
+      <button id="g-add">加入分组</button>
+    </div>
+    <ul id="g-list" class="chips"></ul>
+    <div class="row">
+      <label>聚合列 <select id="a-col"></select></label>
+      <label>函数
+        <select id="a-func">
+          <option>count</option><option>sum</option><option>avg</option>
+          <option>min</option><option>max</option>
+        </select>
+      </label>
+      <input id="a-alias" placeholder="结果列别名">
+      <button id="a-add">加聚合</button>
+    </div>
+    <ul id="a-list" class="chips"></ul>
+  </div>
+
+  <div class="card" id="detail-card" hidden>
+    <h3>明细列（留空取全部暴露列）</h3>
+    <div class="row">
+      <label>选择列 <select id="d-col"></select></label>
+      <button id="d-add">加入选择</button>
+    </div>
+    <ul id="d-list" class="chips"></ul>
+  </div>
+
+  <div class="card result-card">
+    <h3>查询结果 <span id="q-meta" class="hint"></span></h3>
+    <div id="q-error" class="error-box" hidden></div>
+    <div class="table-wrap"><table id="q-result"></table></div>
+    <details><summary>实际下发到版本化视图的受限 SQL</summary>
+      <pre id="q-sql"></pre></details>
+  </div>
+</section>
+
+<!-- ===================================================== 策略管理 -->
+<section id="tab-policy" class="panel">
+  <div class="card">
+    <div class="row">
+      <label>查看版本 <select id="p-version"></select></label>
+      <button id="p-load">载入到编辑器</button>
+      <button id="p-upgrade">生成 v2 收紧草稿</button>
+      <button id="p-validate">校验</button>
+      <button id="p-preview">预览影响</button>
+      <button id="p-save">存草稿</button>
+      <button id="p-publish" class="danger">发布（原子切换）</button>
+    </div>
+    <div id="p-msg" class="hint"></div>
+  </div>
+  <div class="card">
+    <h3>策略 JSON（可直接编辑：k / allow_detail / 行过滤 / 列变换 / 关联）</h3>
+    <textarea id="p-editor" spellcheck="false"></textarea>
+  </div>
+  <div class="card">
+    <h3>发布前影响预览（同一场景：现行版本 vs 草稿）</h3>
+    <div id="p-preview"></div>
+  </div>
+  <div class="card">
+    <h3>版本列表</h3>
+    <div class="table-wrap"><table id="p-versions"></table></div>
+  </div>
+</section>
+
+<!-- ===================================================== 任务审计 -->
+<section id="tab-jobs" class="panel">
+  <div class="card">
+    <div class="row">
+      <button id="j-refresh" class="primary">刷新任务</button>
+      <button id="a-refresh">刷新审计日志</button>
+    </div>
+    <div class="table-wrap"><table id="j-table"></table></div>
+  </div>
+  <div class="card">
+    <h3>审计日志（所有查询/导出/发布，含请求版本与实际执行版本）</h3>
+    <div class="table-wrap"><table id="a-table"></table></div>
+  </div>
+</section>
+
+<footer>
+  虚构数据演示系统 · 遮蔽姓名不等于匿名化：本系统以用途视图 + 列变换 + 行范围 +
+  k 匿名 + 伪标识隔离的组合控制降低重识别风险，不承诺绝对匿名。
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
